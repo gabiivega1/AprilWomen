@@ -24,7 +24,6 @@ document.querySelector('#btnNuevaVariante').addEventListener('click', cargarNuev
 document.querySelector('#btnDashboard').addEventListener('click', cargarDashboard)
 
 async function cargarStock() {
-
   const { data, error } = await supabase
     .from('variantesProducto')
     .select(`
@@ -49,49 +48,33 @@ async function cargarStock() {
     <div class="contenedor-productos">
       ${productosActivos.map(v => `
         <div class="card">
-
           <h2>${v.Productos?.nombre || ''}</h2>
 
-          <p>Color: ${v.Colores?.nombre || ''}</p>
+          <p><strong>Detalle:</strong> ${v.Productos?.descripcion || 'Sin descripción'}</p>
+          <p><strong>Color:</strong> ${v.Colores?.nombre || ''}</p>
+          <p><strong>Talle:</strong> ${v.Talles?.nombre || ''}</p>
+          <p><strong>SKU:</strong> ${v.sku || ''}</p>
+          <p><strong>Stock:</strong> ${v.stock ?? 0}</p>
+          <p><strong>Precio:</strong> $${v.Productos?.precioVenta ?? 0}</p>
 
-          <p>Talle: ${v.Talles?.nombre || ''}</p>
-
-          <p>Stock: ${v.stock ?? 0}</p>
-
-          <p>Precio: $${v.Productos?.precioVenta ?? 0}</p>
-
-          <button
-            class="btnEditarStock"
-            data-id="${v.idVariante}"
-            data-stock="${v.stock}"
-          >
+          <button class="btnEditarStock" data-id="${v.idVariante}" data-stock="${v.stock}">
             Editar Stock
           </button>
 
-          <button
-            class="btnEditarPrecio"
-            data-id="${v.Productos?.idProducto}"
-            data-precio="${v.Productos?.precioVenta}"
-          >
+          <button class="btnEditarPrecio" data-id="${v.Productos?.idProducto}" data-precio="${v.Productos?.precioVenta}">
             Editar Precio
           </button>
-
         </div>
       `).join('')}
     </div>
   `
 
   document.querySelectorAll('.btnEditarStock').forEach(btn => {
-
     btn.addEventListener('click', async () => {
-
       const idVariante = Number(btn.dataset.id)
       const stockActual = Number(btn.dataset.stock)
 
-      const nuevoStock = prompt(
-        'Nuevo stock:',
-        stockActual
-      )
+      const nuevoStock = prompt('Nuevo stock:', stockActual)
 
       if (nuevoStock === null) return
 
@@ -109,9 +92,33 @@ async function cargarStock() {
       }
 
       cargarStock()
-
     })
+  })
 
+  document.querySelectorAll('.btnEditarPrecio').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idProducto = Number(btn.dataset.id)
+      const precioActual = Number(btn.dataset.precio)
+
+      const nuevoPrecio = prompt('Nuevo precio:', precioActual)
+
+      if (nuevoPrecio === null) return
+
+      const { error } = await supabase
+        .from('Productos')
+        .update({
+          precioVenta: Number(nuevoPrecio)
+        })
+        .eq('idProducto', idProducto)
+
+      if (error) {
+        console.error(error)
+        alert('Error al actualizar precio')
+        return
+      }
+
+      cargarStock()
+    })
   })
 }
 
@@ -152,139 +159,147 @@ async function cargarStock() {
 
 
 
-async function cargarVentas() {
-  carrito = []
-
-  const { data, error } = await supabase
-    .from('variantesProducto')
-    .select(`
-      *,
-      Productos (*),
-      Colores (*),
-      Talles (*)
-    `)
-
-  if (error) {
-    console.error(error)
-    return
-  }
-
-  document.querySelector('#contenido').innerHTML = `
-    <h1>Nueva Venta</h1>
-
-    <input
-      id="buscadorProducto"
-      type="text"
-      placeholder="Buscar por producto, color, talle o SKU..."
-    >
-
-    <select id="selectProducto"></select>
-
-    <input
-      id="cantidad"
-      type="number"
-      min="1"
-      value="1"
-    >
-
-    <button id="agregarCarrito">
-      Agregar
-    </button>
-
-    <div id="carrito">
-      <h2>Carrito</h2>
-      <p>No hay productos agregados.</p>
-    </div>
-
-    <h3>Método de Pago</h3>
-
-    <select id="metodoPago">
-      <option value="Efectivo">Efectivo</option>
-      <option value="Transferencia">Transferencia</option>
-      <option value="Débito">Débito</option>
-      <option value="Crédito">Crédito</option>
-    </select>
-
-    <br><br>
-
-    <button id="finalizarVenta">
-      Finalizar Venta
-    </button>
-  `
-
-  const selectProducto = document.querySelector('#selectProducto')
-  const buscadorProducto = document.querySelector('#buscadorProducto')
-
-  function renderSelect(filtro = '') {
-    const texto = filtro.toLowerCase()
-
-    const filtrados = data.filter(v => {
-      const nombre = v.Productos?.nombre?.toLowerCase() || ''
-      const color = v.Colores?.nombre?.toLowerCase() || ''
-      const talle = v.Talles?.nombre?.toLowerCase() || ''
-      const sku = v.sku?.toLowerCase() || ''
-
-      return (
-        nombre.includes(texto) ||
-        color.includes(texto) ||
-        talle.includes(texto) ||
-        sku.includes(texto)
-      )
+  async function cargarVentas() {
+    carrito = []
+  
+    const { data, error } = await supabase
+      .from('variantesProducto')
+      .select(`
+        *,
+        Productos (*),
+        Colores (*),
+        Talles (*)
+      `)
+  
+    if (error) {
+      console.error(error)
+      return
+    }
+  
+    const productosActivos = data.filter(
+      v => v.Productos?.disponible === true
+    )
+  
+    document.querySelector('#contenido').innerHTML = `
+      <h1>Nueva Venta</h1>
+  
+      <input
+        id="buscadorProducto"
+        type="text"
+        placeholder="Buscar por nombre, detalle, color, talle o SKU..."
+      >
+  
+      <select id="selectProducto"></select>
+  
+      <input
+        id="cantidad"
+        type="number"
+        min="1"
+        value="1"
+      >
+  
+      <button id="agregarCarrito">
+        Agregar
+      </button>
+  
+      <div id="carrito">
+        <h2>Carrito</h2>
+        <p>No hay productos agregados.</p>
+      </div>
+  
+      <h3>Método de Pago</h3>
+  
+      <select id="metodoPago">
+        <option value="Efectivo">Efectivo</option>
+        <option value="Transferencia">Transferencia</option>
+        <option value="Débito">Débito</option>
+        <option value="Crédito">Crédito</option>
+      </select>
+  
+      <br><br>
+  
+      <button id="finalizarVenta">
+        Finalizar Venta
+      </button>
+    `
+  
+    const selectProducto = document.querySelector('#selectProducto')
+    const buscadorProducto = document.querySelector('#buscadorProducto')
+  
+    function renderSelect(filtro = '') {
+      const texto = filtro.toLowerCase()
+  
+      const filtrados = productosActivos.filter(v => {
+        const nombre = v.Productos?.nombre?.toLowerCase() || ''
+        const descripcion = v.Productos?.descripcion?.toLowerCase() || ''
+        const color = v.Colores?.nombre?.toLowerCase() || ''
+        const talle = v.Talles?.nombre?.toLowerCase() || ''
+        const sku = v.sku?.toLowerCase() || ''
+  
+        return (
+          nombre.includes(texto) ||
+          descripcion.includes(texto) ||
+          color.includes(texto) ||
+          talle.includes(texto) ||
+          sku.includes(texto)
+        )
+      })
+  
+      selectProducto.innerHTML = filtrados.map(v => `
+        <option value="${v.idVariante}">
+          ${v.Productos?.nombre || ''} |
+          ${v.Productos?.descripcion || 'Sin detalle'} |
+          Color: ${v.Colores?.nombre || ''} |
+          Talle: ${v.Talles?.nombre || ''} |
+          SKU: ${v.sku || ''} |
+          Stock: ${v.stock}
+        </option>
+      `).join('')
+    }
+  
+    renderSelect()
+  
+    buscadorProducto.addEventListener('input', () => {
+      renderSelect(buscadorProducto.value)
     })
-
-    selectProducto.innerHTML = filtrados.map(v => `
-      <option value="${v.idVariante}">
-        ${v.Productos?.nombre || ''} -
-        ${v.Colores?.nombre || ''} -
-        ${v.Talles?.nombre || ''} -
-        SKU: ${v.sku || ''} -
-        Stock: ${v.stock}
-      </option>
-    `).join('')
-  }
-
-  renderSelect()
-
-  buscadorProducto.addEventListener('input', () => {
-    renderSelect(buscadorProducto.value)
-  })
-
-  document.querySelector('#agregarCarrito').addEventListener('click', () => {
-    const idVariante = Number(document.querySelector('#selectProducto').value)
-    const cantidad = Number(document.querySelector('#cantidad').value)
-
-    const variante = data.find(v => v.idVariante === idVariante)
-
-    if (!variante) {
-      alert('Producto no encontrado')
-      return
-    }
-
-    if (cantidad <= 0) {
-      alert('La cantidad debe ser mayor a 0')
-      return
-    }
-
-    if (cantidad > variante.stock) {
-      alert('No hay suficiente stock disponible')
-      return
-    }
-
-    carrito.push({
-      idVariante,
-      nombre: variante.Productos?.nombre || '',
-      color: variante.Colores?.nombre || '',
-      talle: variante.Talles?.nombre || '',
-      precio: variante.Productos?.precioVenta || 0,
-      cantidad,
-      stockActual: variante.stock
+  
+    document.querySelector('#agregarCarrito').addEventListener('click', () => {
+      const idVariante = Number(document.querySelector('#selectProducto').value)
+      const cantidad = Number(document.querySelector('#cantidad').value)
+  
+      const variante = productosActivos.find(v => v.idVariante === idVariante)
+  
+      if (!variante) {
+        alert('Producto no encontrado')
+        return
+      }
+  
+      if (cantidad <= 0) {
+        alert('La cantidad debe ser mayor a 0')
+        return
+      }
+  
+      if (cantidad > variante.stock) {
+        alert('No hay suficiente stock disponible')
+        return
+      }
+  
+      carrito.push({
+        idVariante,
+        nombre: variante.Productos?.nombre || '',
+        descripcion: variante.Productos?.descripcion || '',
+        color: variante.Colores?.nombre || '',
+        talle: variante.Talles?.nombre || '',
+        precio: variante.Productos?.precioVenta || 0,
+        cantidad,
+        stockActual: variante.stock
+      })
+  
+      mostrarCarrito()
     })
-
-    mostrarCarrito()
-  })
-
-  document.querySelector('#finalizarVenta').addEventListener('click', finalizarVenta)
-}
+  
+    document.querySelector('#finalizarVenta').addEventListener('click', finalizarVenta)
+  }
 
 function mostrarCarrito() {
   const total = carrito.reduce(
